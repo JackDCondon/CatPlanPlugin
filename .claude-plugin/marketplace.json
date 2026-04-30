@@ -1,0 +1,14 @@
+{
+  "name": "catplan-plugins",
+  "owner": {
+    "name": "Jack"
+  },
+  "plugins": [
+    {
+      "name": "catplan",
+      "source": "./",
+      "description": "CatPlan workflow orchestration — skills, hooks, and review agents for kanban-driven AI development",
+      "version": "0.1.1"
+    }
+  ]
+}

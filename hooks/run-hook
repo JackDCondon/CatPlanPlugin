@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+die() {
+    echo "Error: $*" >&2
+    exit 43
+}
+
+find_bash() {
+    for path in /usr/local/bin/bash /usr/bin/bash /bin/bash "$PROGRAMFILES/Git/usr/bin/bash.exe" "$PROGRAMFILES/Git/bin/bash.exe" /c/Git/usr/bin/bash.exe /c/Git/bin/bash.exe; do
+        if [ -x "$path" ]; then
+            echo "$path"
+            return 0
+        fi
+    done
+    command -v bash && return 0 || return 1
+}
+
+find_bash || die "bash not found"
+
+hook="$1"
+shift
+hook_dir="$(dirname "$0")"
+hook_path="$hook_dir/$hook"
+
+[ -x "$hook_path" ] || die "hook not found: $hook"
+
+exec "$(find_bash)" "$hook_path" "$@"

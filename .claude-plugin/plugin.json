@@ -1,0 +1,18 @@
+{
+  "name": "catplan",
+  "version": "0.1.1",
+  "description": "CatPlan workflow orchestration — skills, hooks, and review agents for kanban-driven AI development",
+  "author": {
+    "name": "Jack",
+    "url": "https://github.com/JackDCondon/CatPlanPlugin"
+  },
+  "repository": "https://github.com/JackDCondon/CatPlanPlugin",
+  "license": "MIT",
+  "keywords": [
+    "catplan",
+    "kanban",
+    "workflow",
+    "orchestration",
+    "mcp"
+  ]
+}
