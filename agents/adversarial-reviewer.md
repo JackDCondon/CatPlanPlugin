@@ -5,7 +5,6 @@ description: |
   Dispatched as a subagent during brainstorming ralph loops.
 model: inherit
 disallowedTools: [Write, Edit, NotebookEdit]
-maxTurns: 20
 ---
 
 # Adversarial Reviewer

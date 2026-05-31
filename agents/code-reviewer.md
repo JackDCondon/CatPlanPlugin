@@ -6,7 +6,6 @@ tools:
   - Glob
   - Grep
   - Bash
-maxTurns: 15
 disallowedTools:
   - Write
   - Edit

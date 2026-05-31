@@ -44,7 +44,7 @@ Dispatch both reviewers in sequence per round:
 4. If code-reviewer returns ISSUES: fix the issues first
 ```
 
-Each reviewer has `maxTurns: 15` and `disallowedTools: [Write, Edit, NotebookEdit]`.
+Each reviewer has `disallowedTools: [Write, Edit, NotebookEdit]`.
 
 ## How to Read Verdict
 

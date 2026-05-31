@@ -71,7 +71,6 @@ Hand off to the `code-reviewer` agent with the gathered context:
 ---
 model: claude-sonnet-4-5
 tools: [Read, Glob, Grep, Bash]
-maxTurns: 15
 disallowedTools: [Write, Edit, NotebookEdit]
 ---
 ```

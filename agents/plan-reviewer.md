@@ -5,7 +5,6 @@ description: |
   Dispatched as a subagent during implementation-plan ralph loops.
 model: inherit
 disallowedTools: [Write, Edit, NotebookEdit]
-maxTurns: 50
 ---
 
 # Plan Reviewer
@@ -128,17 +127,6 @@ Cannot evaluate: [specific reason — missing artifact, insufficient context, et
 **VERDICT: PASS** means no gaps found after thorough review.
 **VERDICT: GAPS** means N gaps were found and documented in your table.
 **VERDICT: UNCLEAR** means you lack the information to evaluate (not the same as "looks fine").
-
-### Turn-budget fallback (mandatory)
-
-The `VERDICT:` line MUST be the final line of your output. If you have fewer than ~5 tool calls of headroom remaining against your `maxTurns` budget and you have not yet finished the checklist, immediately stop investigating and output:
-
-```
-VERDICT: UNCLEAR
-Turn budget nearly exhausted: [one-line note naming which checklist sections were not evaluated]
-```
-
-This makes the failure mode legible to the orchestrating ralph loop instead of presenting as silent truncation. Issuing `VERDICT: UNCLEAR` under turn-budget pressure is correct behavior — never let the dispatch end without a verdict line.
 
 ## Verify-Fixes Mode (Round 2+)
 
