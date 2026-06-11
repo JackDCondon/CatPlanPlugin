@@ -95,6 +95,27 @@ In the **Bash tool**, paths must use forward slashes (`D:/foo`); raw backslashes
 
 Replace `{workspace_path}` and `{ticket_code}` with the actual values before dispatching.
 
+## Main-Mode Subagent Dispatch Block
+
+Include this block verbatim when dispatching a subagent in **main-mode** (no worktree, repo root only):
+
+````
+## VCS Rules (Git — Main Mode)
+
+You are working directly in the repo root. There is no worktree. Do NOT call `catagent isolate`.
+
+In the **Bash tool**, paths must use forward slashes (`D:/foo`); raw backslashes are stripped as POSIX escapes. The **PowerShell tool** accepts `\\` normally (`D:\\foo`).
+
+- Create new files: write the file, then `git add <filepath>`
+- Modify existing files: edit freely, then `git add <filepath>` to stage
+- Stage only the files you own (per the wave file map). Do NOT use `git add -A`
+- Do NOT commit — the orchestrator makes one aggregate commit after all tasks complete
+- Do NOT push — the human pushes when ready
+- Do NOT use any `p4` commands
+````
+
+The orchestrator accumulates each task's `files` into a union set during Phase 2 and calls `commit-to-mainline` in Phase 3 with that full set.
+
 ## Evidence Format
 
 After each task completes, add a comment to the task with the commit hash:
@@ -113,6 +134,8 @@ tests: passed
 
 The `commit:` line is the minimum required evidence. Additional fields (`verdict:`, `tests:`) are added by the review pipeline.
 
+**Main-mode note:** In main-mode (no per-task commits), the `commit:` line is omitted — evidence is the `verdict:` and `tests:` lines added by the review pipeline. Git tasks may optionally record `staged: <file list>` instead.
+
 ## Operations
 
 Operations are divided into **composites** (multi-step workflows) and **primitives** (single focused commands). Composites call primitives; primitives are the concrete implementations.
@@ -127,7 +150,7 @@ Operations are divided into **composites** (multi-step workflows) and **primitiv
 
 **Inputs**: `message` — commit message; `files` — the exact list of paths the agent edited this session
 **Outputs**: `ok` + local commit sha
-**Used by**: bug-board Resolve prompt's `## Commit to Mainline` section
+**Used by**: bug-board Resolve prompt's `## Commit to Mainline` section, software-no-isolation execute-tasks Phase 3
 
 **Steps**:
 1. Commit only the listed paths:
@@ -538,6 +561,20 @@ The outer delivery receipt template (tasks table, test results, notes) is owned 
 ## Success-Path Cleanup
 
 After `publish` succeeds, the orchestrator runs `catagent cleanup {ticket_code}` to remove the local worktree from disk. Nothing remains on the local machine — the worktree is gone. On the remote, the feature branch and open PR both persist on GitHub until `land` merges the PR and optionally deletes the branch via the cleanup composite. The `land` workflow expects to find the PR URL (already stored on the ticket) and a clean, clone-able remote branch; if local state is needed, `land` can recreate a worktree via `catagent isolate`. This is safe because the PR carries the complete diff, the merge happens via the GitHub API, and recreating a local checkout is cheap. Subagent crash, deadlock, or manual halt also triggers `catagent cleanup {ticket_code}` from the orchestrator, so success-path and abort-path cleanup are identical — the section exists to make that contract explicit and symmetric with Perforce.
+
+## Main-Mode Receipt Section
+
+Include this VCS block in the delivery receipt (`code.md`) for main-mode execute-tasks:
+
+````markdown
+## Git
+- **Local commit:** <SHA from commit-to-mainline, or "NOTHING_TO_COMMIT — no files changed">
+- **Branch:** <current branch name, from `git rev-parse --abbrev-ref HEAD`>
+- **Status:** Committed locally. Push when ready: `git push`
+
+## Files Changed
+<output of `git diff HEAD~1 --stat` (omit if NOTHING_TO_COMMIT)>
+````
 
 ## Tooling
 

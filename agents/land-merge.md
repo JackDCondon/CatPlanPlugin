@@ -56,6 +56,26 @@ Match changed files against each stack's `detect` patterns. Collect all matching
 
 ---
 
+### Skill-type build/test commands
+
+**Skill-type commands:** For a build/test value of the form `{"type":"skill","name":"<name>","args":"<args>"}`,
+locate the skill file in this order:
+1. `plugin/skills/<name>/SKILL.md` relative to the repo root (CatPlan repo / vendored plugin source).
+2. Glob `~/.claude/plugins/cache/**/skills/<name>/SKILL.md` (the Claude Code plugin install
+   cache — verified layout: `cache/<marketplace>/<plugin>/<version>/skills/<name>/SKILL.md`);
+   if multiple versions match, use the highest version directory.
+If neither resolves, treat the command's outcome as UNVALIDATED with reason "skill <name> not
+installed". Read the file and follow its instructions inline, passing `<args>` as its arguments.
+The skill's final `RESULT:` line is the command's outcome: `PASS` = success, `FAIL` = failure
+(same handling as a failing shell command), `UNVALIDATED` = could not run — record prominently
+in the receipt as UNVALIDATED, do NOT treat as pass or fail, do NOT block.
+
+**Result mapping:** A skill `RESULT: FAIL` on a build command maps to `BUILD_FAILURE`; on a test command it maps to `TEST_FAILURE` — same handling as any failing shell command, with diagnostics drawn from the skill's output. A skill `RESULT: UNVALIDATED` → continue the land, but the land summary/receipt must carry a prominent `UNVALIDATED: <stack> — <reason>` line (this is a non-interactive context: receipt text, not a prompt to the user).
+
+**Note:** The pre-existing-error baseline paragraph in Steps 5a and 5b applies only to string/array/shell commands — a skill manages its own result interpretation.
+
+---
+
 ## Step 5a — Git path
 
 ### Pre-flight (Git-specific)
@@ -94,7 +114,7 @@ Follow the loaded VCS skill's composite operations in order:
 
    If unintentionally missing files are found, stop with `MISSING_FILES` and list them.
 
-7. **Build and test** — Run the build commands for all matched stacks (null commands skipped silently). Then run the test commands for all matched stacks.
+7. **Build and test** — Run the build commands for all matched stacks (null commands skipped silently). Then run the test commands for all matched stacks. A `{"type":"skill"}` build/test value runs per *Skill-type build/test commands* above.
 
    Before running, capture a baseline of pre-existing errors. Run the commands, then compare: if the failing files were not touched by this merge (errors exist on the parent commit too), treat the result as **passing** — these are pre-existing errors.
 
@@ -134,7 +154,7 @@ Follow the loaded VCS skill's composite operations in order:
 
 4. **resolve-auto()** — Run automatic resolve. If conflicts remain that cannot be auto-resolved, stop with `CONFLICT` and include the conflict file list in diagnostics.
 
-5. **Build and test** — Run the build and test commands for all matched stacks, same pre-existing-error logic as the Git path.
+5. **Build and test** — Run the build and test commands for all matched stacks, same pre-existing-error logic as the Git path. A `{"type":"skill"}` build/test value runs per *Skill-type build/test commands* above.
 
    - Build failure in touched files — stop with `BUILD_FAILURE`
    - Test failure — stop with `TEST_FAILURE`

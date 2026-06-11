@@ -148,6 +148,32 @@ Do NOT use git commands. This is a Perforce workspace.
 
 ---
 
+## Main-Mode Subagent Dispatch Block
+
+Include this block verbatim in EVERY implementation subagent prompt for **main-mode** (non-isolated) Perforce execution:
+
+````
+## Perforce File Management (Main Mode)
+
+You are working in the user's Perforce workspace. There is no isolated client — use the ambient P4 environment already configured by the user. Do NOT call `catagent isolate`.
+
+> **Windows path rule:** In the **Bash tool**, paths must use forward slashes (`D:/foo`); raw backslashes are stripped as POSIX escapes. The **PowerShell tool** accepts `\` normally (`D:\foo`).
+
+**File rules (all operations):**
+- **Existing files**: Run `p4 edit <filepath>` BEFORE modifying — P4 will not track the change otherwise
+- **New files**: Create the file on disk, then run `p4 add <filepath>`
+- **Delete files**: Run `p4 delete <filepath>`
+- **Move/rename**: Run `p4 move <old> <new>`
+
+Files accumulate in the **default changelist**. Do NOT create a numbered changelist, do NOT shelve, do NOT submit. The user submits when ready.
+
+Do NOT use git commands. This is a Perforce workspace.
+````
+
+The orchestrator runs `p4 reconcile -n` over the union of all task-touched files after Phase 2 to surface any on-disk changes that were not opened via `p4 edit`/`p4 add`.
+
+---
+
 ## Evidence Format
 
 When adding task completion evidence:
@@ -252,7 +278,7 @@ result = cleanup(cl_number="12345", ticket_code="CAT-42")
 
 ### `commit-to-mainline`
 
-**Inputs**: `message` — change description; `ticket_code` — ticket identifier (used to source expected stream from project config)
+**Inputs**: `message` — change description; `ticket_code` — ticket identifier (used to source expected stream from project config); `files` — list of depot or local paths edited this session (whichever form was used during `p4 edit`/`p4 add`; both are valid for `p4 reopen`)
 **Outputs**: `ok` (+ submitted CL# for receipt)
 **Used by**: bug-board Resolve prompt's `## Commit to Mainline` section
 
@@ -273,7 +299,7 @@ result = cleanup(cl_number="12345", ticket_code="CAT-42")
 4. **Create/confirm a numbered changelist:** 
    - Run `p4 change -o | <inject message>` and pipe to `p4 change -i` to create a numbered changelist (see `create-changelist` primitive for detailed recipe).
    - Extract the CL number from the `Change N created…` output.
-   - Run `p4 reopen -c <cl_number> //...` to move all opened files into the new numbered CL.
+   - Run `p4 reopen -c <cl_number> <files>` to move the agent-edited files into the new numbered CL.
 
 5. **Submit the changelist:** Run `p4 submit -c <cl_number>`.
    - If output contains `Change <n> submitted`: return `ok` with the CL# for the receipt.
@@ -291,17 +317,17 @@ result = cleanup(cl_number="12345", ticket_code="CAT-42")
 
 **Usage example**:
 ```
-result = commit-to-mainline(message="fix: resolve customer bug CAT-42", ticket_code="CAT-42")
+result = commit-to-mainline(message="fix: resolve customer bug CAT-42", ticket_code="CAT-42", files=["//depot/main/src/foo.py", "//depot/main/src/bar.py"])
 # result = ok
 # result.cl_number = "98765"
-# (CL 98765 was submitted to the configured stream)
+# (CL 98765 was submitted to the configured stream, scoped to the listed files)
 
 # WRONG_STREAM example:
-result = commit-to-mainline(message="fix: …", ticket_code="CAT-42")
+result = commit-to-mainline(message="fix: …", ticket_code="CAT-42", files=["//depot/main/config.json"])
 # Halts with: WRONG_STREAM: client mapped to //depot/dev, expected //depot/main
 
 # STREAM_NOT_CONFIGURED example:
-result = commit-to-mainline(message="fix: …", ticket_code="CAT-99")
+result = commit-to-mainline(message="fix: …", ticket_code="CAT-99", files=["//depot/main/src/module.py"])
 # Halts with: STREAM_NOT_CONFIGURED: expected stream is unset for this project; cannot verify submit safety
 ```
 
@@ -597,6 +623,24 @@ This section applies after `publish` completes successfully (shelved CL created,
 **What Land PR expects to find:** The same client (`p4Client`) with the shelved CL still present. Land PR runs `catagent isolate` (idempotent — reuses the alive workspace) and then `p4 unshelve -s <cl_number>`. The shelve must not be deleted before land completes. To verify the shelve is still available: `p4 changes -c <p4Client> -s shelved`.
 
 **Abort path (this section does NOT apply):** If execute-tasks aborts before or during `publish`, run the `cleanup` composite as normal — it deletes the shelved CL and tears down the workspace.
+
+---
+
+## Main-Mode Receipt Section
+
+Include this VCS block in the delivery receipt (`code.md`) for main-mode execute-tasks:
+
+```markdown
+## Perforce
+- **Status:** Files open in default changelist. Submit when ready: `p4 submit`
+- **Client:** <value of `$env:P4CLIENT` or `p4 -ztag info | grep clientName`, from ambient environment>
+
+## Files Open
+<output of `p4 opened` (default changelist)>
+
+## Reconcile Preview
+<output of `p4 reconcile -n <file1> <file2> ...` over task-touched files, or "no unopened on-disk changes found">
+```
 
 ---
 

@@ -35,6 +35,30 @@ User invokes `/catplan:init` from repo root.
 - `pyproject.toml`: takes priority over `requirements.txt` (only one python stack)
 - If no markers found: notify user, suggest manual creation, stop
 
+### Step 3.5 — Unreal test-filter discovery
+_Runs only when detection produced an `unreal` stack._
+
+1. Take the project name from the `.uproject` filename stem (e.g., `MyProject.uproject` → `MyProject`).
+2. Grep the following paths for automation test macros:
+   - `Source/**/*.cpp` and `Source/**/*.h`
+   - `Plugins/**/Source/**/*.cpp` and `Plugins/**/Source/**/*.h` (if a `Plugins/` directory is present)
+   - Macros to match: `IMPLEMENT_SIMPLE_AUTOMATION_TEST`, `IMPLEMENT_COMPLEX_AUTOMATION_TEST`,
+     `IMPLEMENT_CUSTOM_SIMPLE_AUTOMATION_TEST`, `BEGIN_DEFINE_SPEC`, `DEFINE_SPEC`,
+     `TEST_CLASS`, `NETWORK_TEST_CLASS`
+3. From each match, extract the pretty-name string literal (the dotted `"Group.Sub.Name"` argument).
+   Collect all first segments (the part before the first `.`). Propose the most common first segment
+   as the filter.
+4. Present to the user:
+   > Proposed UE test filter: `<X>` (from N automation tests found). Confirm or enter another: [Y/edit]
+   - If the user confirms or presses Y → use `<X>` as the filter value in the draft.
+   - If the user types a replacement → use that value instead.
+5. **If no macros are found:** use the placeholder `REPLACE_ME` in the draft and print a prominent
+   warning:
+   > **Warning:** No automation tests found — filter set to `REPLACE_ME`; UE tests will report
+   > UNVALIDATED until you set a real filter.
+
+   NEVER write an empty filter or an engine-wide wildcard. `REPLACE_ME` is the required fallback.
+
 ### Step 4 — Present draft
 - Print: "Detected N stack(s): \<names\>"
 - Print full proposed `.catplan/project.json` (formatted JSON)
@@ -61,7 +85,10 @@ User invokes `/catplan:init` from repo root.
 | package.json | no known framework | node | ["package.json","src/**/*.ts","src/**/*.js"] | null | "npm test" |
 | go.mod | — | go | ["go.mod","**/*.go"] | "go build ./..." | "go test ./..." |
 | Cargo.toml | — | rust | ["Cargo.toml","src/**/*.rs"] | "cargo build" | "cargo test" |
-| *.uproject | — | unreal | ["*.uproject","Source/**/*.cpp","Source/**/*.h"] | null | {"type":"skill","name":"unreal-build-and-test"} |
+| *.uproject | — | unreal | ["*.uproject","Source/**/*.cpp","Source/**/*.h"] | {"type":"skill","name":"catplan-unreal-test","args":"compile"} | {"type":"skill","name":"catplan-unreal-test","args":"test --filter <discovered>"} |
+
+> **Unreal test note:** `<discovered>` in the row above is a placeholder — never write it literally into `project.json`. Substitute it with the filter value confirmed in Step 3.5, or `REPLACE_ME` when no automation tests were found.
+
 | pyproject.toml | — | python | ["pyproject.toml","**/*.py"] | null | "pytest" |
 | requirements.txt | no pyproject.toml | python | ["requirements.txt","**/*.py"] | null | "pytest" |
 | pom.xml | — | java | ["pom.xml","src/**/*.java"] | "mvn compile -q" | "mvn test -q" |
@@ -83,6 +110,10 @@ User invokes `/catplan:init` from repo root.
   ]
 }
 ```
+
+A skill `name` resolves to `plugin/skills/<name>/SKILL.md` (or the equivalent entry in the installed
+plugin cache). The `args` field carries the mode and any flags passed to that skill at invocation
+time (e.g., `"compile"` or `"test --filter MyProject"`).
 
 ## Key Behaviors
 - Never write to disk without explicit `y` from user

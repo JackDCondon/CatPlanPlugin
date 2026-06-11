@@ -41,7 +41,7 @@ Read `.catplan-workspace.json` at the workspace root. Extract the `vcs` field:
 
 If `.catplan-workspace.json` is missing entirely, fall back to `catagent project get` to determine VCS. If that also fails, default to git.
 
-After VCS is determined, read the corresponding VCS skill: `vcs-git/SKILL.md` or `vcs-perforce/SKILL.md`. Follow the philosophy, preconditions, and environment setup described there.
+After VCS is determined, read the corresponding VCS skill: `plugin/skills/vcs-git/SKILL.md` or `plugin/skills/vcs-perforce/SKILL.md`. Follow the philosophy, preconditions, and environment setup described there.
 
 ### VCS-specific pre-flight
 
@@ -382,8 +382,22 @@ The matched stacks will have build and test commands in various formats. Below i
 | `string` | `"npm run build"` | Run as shell command via Bash |
 | `array` | `["step1", "step2"]` | Run each element in sequence via Bash |
 | `object.shell` | `{"type":"shell","command":"..."}` | Run `command` as shell |
-| `object.skill` | `{"type":"skill","name":"foo","args":"..."}` | **Not supported** — emit `RESOLUTION_BUILD_FAILURE` or `RESOLUTION_TEST_FAILURE` (depending on context) with diagnostic "Unsupported command type: skill." |
+| `object.skill` | `{"type":"skill","name":"foo","args":"..."}` | Load and run the skill (see *Skill-type commands* below) |
 | `null` | `null` | Skip silently |
+
+**Skill-type commands:** For a build/test value of the form `{"type":"skill","name":"<name>","args":"<args>"}`,
+locate the skill file in this order:
+1. `plugin/skills/<name>/SKILL.md` relative to the repo root (CatPlan repo / vendored plugin source).
+2. Glob `~/.claude/plugins/cache/**/skills/<name>/SKILL.md` (the Claude Code plugin install
+   cache — verified layout: `cache/<marketplace>/<plugin>/<version>/skills/<name>/SKILL.md`);
+   if multiple versions match, use the highest version directory.
+If neither resolves, treat the command's outcome as UNVALIDATED with reason "skill <name> not
+installed". Read the file and follow its instructions inline, passing `<args>` as its arguments.
+The skill's final `RESULT:` line is the command's outcome: `PASS` = success, `FAIL` = failure
+(same handling as a failing shell command), `UNVALIDATED` = could not run — record prominently
+in the receipt as UNVALIDATED, do NOT treat as pass or fail, do NOT block.
+
+**land-resolve skill outcomes:** A skill `RESULT: FAIL` on a build command maps to `RESOLUTION_BUILD_FAILURE`; on a test command it maps to `RESOLUTION_TEST_FAILURE` (note: land-resolve has no pre-existing-error baseline concept — unlike land-merge, which baselines failures present before the merge, any skill `RESULT: FAIL` here is a genuine failure from the resolution itself, and is always subject to the build retry loop / no-retry-on-test rules). A skill `RESULT: UNVALIDATED` does not block — continue, but the receipt carries a prominent `UNVALIDATED: <stack> — <reason>` note; an UNVALIDATED outcome does not trigger and does not consume a build-retry attempt — it is recorded and skipped, not failed. The existing build retry loop (3 attempts) applies to skill builds the same as shell builds; skill TEST failures are not retried (matching the rule below).
 
 ### Build with retry loop
 
@@ -440,6 +454,9 @@ This is the LAST thing the agent outputs on success. Returned as text (not an ar
 ### Build / Test
 - Build: pass
 - Test: pass
+
+### Skill Outcomes
+UNVALIDATED: <stack> — <reason>   *(omit section if none)*
 ```
 
 For MISSING_FILES, the Resolutions table lists the restored files with "restored from feature tip" as rationale.
